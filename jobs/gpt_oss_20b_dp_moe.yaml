@@ -1,0 +1,138 @@
+# GPT 20B with Data Parallel + Mixture of Experts
+#
+# Model: GPT-style 20B parameter model with MoE layers
+# Training strategy: Data Parallel with Expert Parallelism
+#
+# Characteristics:
+# - Compute time: 41 ms per iteration
+# - Model size: 46 GB (used for AllReduce gradient sync)
+# - All-to-All size: 188 MB total (for MoE token routing)
+
+name: "GPT-20B-DP-MoE"
+model_size_bytes: 8800000000  # 8.8 GB
+
+steps:
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 188000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  - !compute
+    duration_us: 133000
+  
+  - !all_to_all_ring
+    total_size_bytes: 376000000
+  # All-to-All for MoE: 188 MB total divided across n*(n-1) flows
+  
+  - !all_reduce {}
+  # AllReduce for gradients: 2*(n-1)/n * 46 GB

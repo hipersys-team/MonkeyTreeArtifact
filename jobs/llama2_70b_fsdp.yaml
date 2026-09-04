@@ -1,0 +1,18 @@
+# Llama 2 70B with FSDP (Fully Sharded Data Parallel)
+#
+# Model: Meta Llama 2 70B
+# Training strategy: FSDP
+#
+# Characteristics:
+# - Compute time: 2.38 seconds per iteration
+# - Model size: 137.43 GB
+# - Single compute phase followed by AllReduce
+
+name: "Llama2-70B-FSDP"
+model_size_bytes: 137430000000
+
+steps:
+  - !compute
+    duration_us: 2378000
+  
+  - !all_reduce {}

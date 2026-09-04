@@ -1,0 +1,20 @@
+# S1 Job Definition
+# High communication intensity job - short compute, large model
+#
+# Characteristics:
+# - Short compute phase (500ms)
+# - Large model size (6.875 GB)
+# - Higher communication-to-compute ratio
+
+name: "S1"
+model_size_bytes: 6875000000
+
+# Steps execute sequentially for each iteration
+# All workers execute the same sequence
+steps:
+  - !compute
+    duration_us: 500000
+  
+  - !all_reduce {}
+  # AllReduce: each worker transfers 2*(n-1)/n * model_size bytes total
+  # in a ring pattern (send to next, receive from previous)

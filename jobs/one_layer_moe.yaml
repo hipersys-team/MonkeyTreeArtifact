@@ -1,0 +1,33 @@
+# One-Layer MoE synthetic job (DP + EP + TP)
+#
+# Models a single MoE layer iteration with:
+#   - TP = 8 (tensor parallelism within each 8-GPU server)
+#   - EP across all workers (expert parallelism via all-to-all)
+#   - DP across TP groups (data parallelism via strided ring)
+#
+# Iteration:
+#   1. 0.5 s compute (forward/backward including intra-server TP)
+#   2. 400 GB all-to-all ring (EP token routing across all N workers)
+#   3. 400 GB strided ring stride=8 (DP gradient sync: 8 independent rings,
+#      one per TP rank, each connecting N/8 workers across servers)
+#
+# With stride=8 and N GPUs:
+#   - ring_size = N/8 (number of DP replicas)
+#   - wire bytes/worker = 2*(ring_size-1)/ring_size * 400 GB
+#   - N=8: ring_size=1, no DP comm (single TP group)
+#   - N=16: ring_size=2, 400 GB/worker
+#   - N=32: ring_size=4, 600 GB/worker
+
+name: "OneLayerMoE"
+model_size_bytes: 400000000000  # 400 GB (used by strided ring)
+
+steps:
+  - !compute
+    duration_us: 500000  # 0.5 s
+
+  - !all_to_all_ring
+    total_size_bytes: 400000000000  # 400 GB total across all N*(N-1) flows
+
+  - !strided_ring
+    stride: 8
+    model_size_bytes: 400000000000  # 400 GB; wire = 2*(N/8 - 1)/(N/8) * 400 GB

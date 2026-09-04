@@ -1,0 +1,48 @@
+# Megatron-style 3D Parallelism: Pipeline Parallel + Tensor Parallel + Data Parallel
+#
+# This job demonstrates full 3D parallelism like Megatron-LM:
+# - PP (Pipeline Parallel): Model split into 4 sequential stages
+# - TP (Tensor Parallel): 8 GPUs per stage for tensor parallelism (e.g., within a node)
+# - DP (Data Parallel): Variable, computed from assigned GPUs
+#
+# Workers per DP replica: 4 stages × 8 TP = 32 GPUs
+# Valid GPU counts: 32, 64, 96, 128, ... (multiples of 32)
+#
+# Worker layout (TP fastest, then DP, then PP/stage slowest):
+# Example with 64 GPUs (dp_replicas=2):
+# - Stage 0:
+#   - DP replica 0: workers 0-7   (TP ranks 0-7)
+#   - DP replica 1: workers 8-15  (TP ranks 0-7)
+# - Stage 1:
+#   - DP replica 0: workers 16-23 (TP ranks 0-7)
+#   - DP replica 1: workers 24-31 (TP ranks 0-7)
+# - Stage 2:
+#   - DP replica 0: workers 32-39 (TP ranks 0-7)
+#   - DP replica 1: workers 40-47 (TP ranks 0-7)
+# - Stage 3:
+#   - DP replica 0: workers 48-55 (TP ranks 0-7)
+#   - DP replica 1: workers 56-63 (TP ranks 0-7)
+#
+# Communication patterns:
+# - PP: Point-to-point from (stage s, dp, tp) to (stage s+1, dp, tp)
+# - DP: AllReduce across DP replicas at iteration end (same stage, same TP rank)
+
+name: "Llama2-70B-TP-DP-PP4"
+model_size_bytes: 4295000000  # 4.295 GB
+
+steps:
+  - !pipeline
+    num_stages: 4
+    tp_size: 8
+    # dp_replicas: computed from num_gpus / (num_stages * tp_size)
+    microbatches: 8
+    
+    # Per-pass timing (microseconds)
+    forward_us: 30000       # 30ms forward per microbatch
+    backward_us: 56000      # 56ms backward per microbatch
+    
+    # Activation tensor size between stages
+    activation_size_bytes: 8390000  # 8.39 MB
+    
+    # Final DP AllReduce: model_size = 4.295 GB
+    model_shard_bytes: 4295000000

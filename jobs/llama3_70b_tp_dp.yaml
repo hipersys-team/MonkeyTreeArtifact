@@ -1,0 +1,19 @@
+# Llama2-70B with Tensor Parallelism + Data Parallelism
+#
+# This model uses tensor parallelism within each 8-GPU server and 
+# data parallelism across servers. The strided ring with stride=8
+# ensures that only GPUs in the same TP position across different
+# DP groups communicate (e.g., GPU 0 on server A talks to GPU 0 on server B).
+#
+# Compute time: 341 ms (forward + backward pass)
+# Model size: 17.18 GB (gradient size for DP allreduce)
+
+name: "Llama3-70B-TP-DP"
+model_size_bytes: 17180000000  # 17.18 GB
+
+steps:
+  - !compute
+    duration_us: 743000
+  - !strided_ring
+    stride: 8
+    model_size_bytes: 17180000000  # AllReduce scales this by 2*(ring_size-1)/ring_size

@@ -1,0 +1,20 @@
+# S2 Job Definition
+# Balanced compute/communication job - long compute, smaller model
+#
+# Characteristics:
+# - Long compute phase (1000ms)
+# - Smaller model size (3.75 GB)
+# - Lower communication-to-compute ratio
+
+name: "S2"
+model_size_bytes: 3750000000
+
+# Steps execute sequentially for each iteration
+# All workers execute the same sequence
+steps:
+  - !compute
+    duration_us: 1000000
+  
+  - !all_reduce {}
+  # AllReduce: each worker transfers 2*(n-1)/n * model_size bytes total
+  # in a ring pattern (send to next, receive from previous)

@@ -6,6 +6,7 @@ Cargo.lock
 *.out
 *.trace
 *.md
+!scripts/requirements.txt
 
 results
 push_plot

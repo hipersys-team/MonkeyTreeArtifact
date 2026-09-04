@@ -1,0 +1,25 @@
+# One-Layer MoE synthetic job (DP + EP + TP)
+#
+# Models a single MoE layer iteration with:
+#   - TP = 8 (tensor parallelism within each 8-GPU server)
+#   - EP across all workers (expert parallelism via all-to-all)
+#   - DP across TP groups (data parallelism via all-reduce)
+#
+# Iteration:
+#   1. 0.5 s compute (forward/backward including intra-server TP)
+#   2. 400 GB all-to-all ring (EP token routing across all N workers)
+#   3. all-reduce of model gradients across all N workers (DP gradient sync)
+#
+# The all-reduce moves wire bytes/worker = 2*(N-1)/N * model_size_bytes.
+
+name: "Qwen3-A3B-16GPU"
+model_size_bytes: 1541079040  # 400 GB (used by all-reduce)
+
+steps:
+  - !compute
+    duration_us: 1230000  # 1.23 s
+
+  - !all_to_all_ring
+    total_size_bytes: 1546188226560  # 400 GB total across all N*(N-1) flows
+
+  - !all_reduce {}

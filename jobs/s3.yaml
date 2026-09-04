@@ -1,0 +1,20 @@
+# S3 Job Definition
+# Medium compute/communication job
+#
+# Characteristics:
+# - Medium compute phase (800ms)
+# - Medium model size (5 GB)
+# - Balanced communication-to-compute ratio
+
+name: "S3"
+model_size_bytes: 5000000000
+
+# Steps execute sequentially for each iteration
+# All workers execute the same sequence
+steps:
+  - !compute
+    duration_us: 800000
+  
+  - !all_reduce {}
+  # AllReduce: each worker transfers 2*(n-1)/n * model_size bytes total
+  # in a ring pattern (send to next, receive from previous)

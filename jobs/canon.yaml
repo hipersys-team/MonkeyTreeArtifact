@@ -1,0 +1,14 @@
+# Canon Job Definition
+# Reference/canonical job for testing
+#
+# Same as S3 - used as a baseline
+
+name: "Canon"
+model_size_bytes: 5000000000
+
+# Steps execute sequentially for each iteration
+steps:
+  - !compute
+    duration_us: 800000
+  
+  - !all_reduce {}

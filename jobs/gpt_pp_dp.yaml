@@ -1,0 +1,37 @@
+# GPT-style model with Pipeline Parallelism + Data Parallelism
+#
+# This job demonstrates a 4-stage pipeline with variable DP replicas.
+#
+# Workers per DP replica: 4 stages × 1 TP = 4 GPUs
+# Valid GPU counts: 32, 64, 96, 128, ... (multiples of num_stages × 8 = 32)
+# This ensures each stage has workers_per_stage that's a multiple of 8 (block size).
+#
+# Training iteration:
+# 1. Forward pass: activations flow through stages 0 -> 1 -> 2 -> 3
+# 2. Backward pass: gradients flow through stages 3 -> 2 -> 1 -> 0
+# 3. DP AllReduce: each stage's replicas sync gradients
+#
+# Worker layout (TP fastest, then DP, then PP/stage slowest):
+# Example with 32 GPUs (dp_replicas=8):
+# - Stage 0: workers 0-7 (DP replicas 0-7)
+# - Stage 1: workers 8-15 (DP replicas 0-7)
+# - Stage 2: workers 16-23 (DP replicas 0-7)
+# - Stage 3: workers 24-31 (DP replicas 0-7)
+#
+# Uses GPipe scheduling with 4 microbatches.
+
+name: "GPT-PP4-DP"
+model_size_bytes: 40000000000  # 40 GB total model
+
+steps:
+  - !pipeline
+    num_stages: 4
+    # tp_size defaults to 1
+    # dp_replicas: computed from num_gpus / num_stages
+    microbatches: 4
+    # Uniform stage configuration
+    forward_us: 50000      # 50ms forward per microbatch
+    backward_us: 100000    # 100ms backward per microbatch
+    activation_size_bytes: 500000000  # 500 MB activations between stages
+    # Final DP AllReduce: 10 GB per stage (40GB / 4 stages)
+    model_shard_bytes: 10000000000
