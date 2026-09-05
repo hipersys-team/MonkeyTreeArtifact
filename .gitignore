@@ -7,6 +7,9 @@ Cargo.lock
 *.trace
 *.md
 !scripts/requirements.txt
+!plots/requirements.txt
+!plots/README.md
+!README.md
 
 results
 push_plot
@@ -22,3 +25,6 @@ ecmp
 
 results
 filtered_results
+
+plots/*.pdf
+plots/*.png
