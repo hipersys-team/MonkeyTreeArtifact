@@ -2,42 +2,29 @@
 """Figure 10: ILP solve time vs. number of migrations on a 1,024-GPU cluster
 (box-and-whisker plot).
 
-Values are embedded below so this script is self-contained.
+  python3 plots/fig10_ilp_solve_time_boxplot.py
+      Plots the measured solve times behind the paper figure (3,790 ILP
+      solves), bundled in fig10_ilp_solve_times.json.
 
-Source: MTree-sigcomm26/figures/ilp_solve_time_plot.py (paper repo). That
-script could optionally recompute these numbers live from
-results/serious_1024_green .out logs; this copy keeps only the hardcoded
-fallback path since the artifact repo does not ship those raw logs.
+  python3 plots/fig10_ilp_solve_time_boxplot.py --from-logs results/load_vs_slowdown/raw
+      Plots solve times from your own simulator run instead, parsed from the
+      *monkeytree_perfect.out logs written by
+      scripts/experiments/run_load_vs_slowdown.py. The parsed samples are also
+      written to fig10_ilp_solve_times_regenerated.json.
+
+Source: MTree-sigcomm26/figures/ilp_solve_time_plot.py (paper repo).
 """
 
+import argparse
+import json
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from collections import defaultdict
 
 OUTPUT_DIR = Path(__file__).parent
-
-# ============================================================================
-# HARDCODED DATA (from results/serious_1024_green, monkeytree_perfect)
-# ============================================================================
-
-MOVES = [1, 2, 3, 4, 5, 6, 7, 8]
-MOVE_COUNTS = [1065, 1880, 483, 295, 57, 8, 1, 1]
-AVG_SOLVE_TIME_MS = [279.30, 538.69, 1181.53, 2173.19, 3780.85, 6694.94, 5391.39, 10219.15]
-
-# Approximate per-move solve-time samples for the box plot, drawn from a
-# normal distribution around each move-count's mean/std (matches the
-# original script's fallback so the box plot shape is representative).
-_STDS = [146.16, 378.60, 834.02, 1374.60, 1907.64, 3394.36, 0, 0]
-
-SOLVE_TIMES_BY_MOVES = defaultdict(list)
-np.random.seed(42)
-for move, count, mean, std in zip(MOVES, MOVE_COUNTS, AVG_SOLVE_TIME_MS, _STDS):
-    if std > 0:
-        times = np.clip(np.random.normal(mean, std, count), 10, None)
-    else:
-        times = [mean] * count
-    SOLVE_TIMES_BY_MOVES[move].extend(times)
+DATA_FILE = OUTPUT_DIR / "fig10_ilp_solve_times.json"
 
 # ============================================================================
 # PLOT STYLING
@@ -54,13 +41,63 @@ plt.rcParams.update({
 })
 
 
-def plot_solve_time_boxplot():
+# ============================================================================
+# DATA LOADING
+# ============================================================================
+
+# Each ILP solve logs "[ILP] Solution: ... num_moves=N" followed by
+# "[MonkeyTreePerfect] ILP solve time: X ms". These are the same lines (and
+# the same pairing) used to extract the bundled paper samples.
+_SOLUTION_RE = re.compile(r"\[ILP\] Solution:.*num_moves=(\d+)")
+_SOLVE_TIME_RE = re.compile(r"\[MonkeyTreePerfect\] ILP solve time: ([\d.]+)ms")
+
+
+def parse_solves(log_path):
+    """[(num_moves, solve_time_ms), ...] for one golden_spine log."""
+    with open(log_path, errors="replace") as f:
+        lines = [l for l in f if _SOLUTION_RE.search(l) or _SOLVE_TIME_RE.search(l)]
+    solves = []
+    i = 0
+    while i < len(lines):
+        sol = _SOLUTION_RE.search(lines[i])
+        if sol and i + 1 < len(lines):
+            t = _SOLVE_TIME_RE.search(lines[i + 1])
+            if t:
+                solves.append((int(sol.group(1)), float(t.group(1))))
+                i += 2
+                continue
+        i += 1
+    return solves
+
+
+def load_from_logs(log_dir):
+    """Parse all monkeytree_perfect logs in log_dir; returns the sample list."""
+    log_files = sorted(Path(log_dir).glob("*monkeytree_perfect.out"))
+    if not log_files:
+        raise SystemExit(f"No *monkeytree_perfect.out files found in {log_dir}")
+    samples = []
+    for path in log_files:
+        samples.extend([path.stem, m, t] for m, t in parse_solves(path))
+    print(f"Parsed {len(samples)} ILP solves from {len(log_files)} log files")
+    return samples
+
+
+def group_by_moves(samples):
+    """move count -> list of solve times (ms); solves needing 0 moves are dropped."""
+    by_moves = defaultdict(list)
+    for _run, num_moves, solve_time_ms in samples:
+        if num_moves > 0:
+            by_moves[num_moves].append(solve_time_ms)
+    return by_moves
+
+
+def plot_solve_time_boxplot(solve_times_by_moves):
     """Box and whisker plot of solve times vs number of moves."""
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.tick_params(axis='both', labelsize=15)
 
-    move_counts = sorted(SOLVE_TIMES_BY_MOVES.keys())
-    box_data = [SOLVE_TIMES_BY_MOVES[m] for m in move_counts]
+    move_counts = sorted(solve_times_by_moves.keys())
+    box_data = [solve_times_by_moves[m] for m in move_counts]
 
     bp = ax.boxplot(box_data, positions=range(len(move_counts)), widths=0.6, patch_artist=True)
 
@@ -85,7 +122,7 @@ def plot_solve_time_boxplot():
 
     ylim = ax.get_ylim()
     for i, m in enumerate(move_counts):
-        count = len(SOLVE_TIMES_BY_MOVES[m])
+        count = len(solve_times_by_moves[m])
         ax.annotate(f'n={count}', (i, ylim[1]),
                    textcoords="offset points", xytext=(0, 3),
                    ha='center', va='bottom', fontsize=11, color='black',
@@ -97,9 +134,28 @@ def plot_solve_time_boxplot():
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--from-logs", type=Path, metavar="DIR",
+                        help="Plot solve times parsed from *monkeytree_perfect.out logs in DIR")
+    args = parser.parse_args()
+
     print("Generating Figure 10 (ILP solve time vs. number of moves)...")
-    fig = plot_solve_time_boxplot()
-    output_path = OUTPUT_DIR / "fig10_ilp_solve_time_boxplot.pdf"
+    if args.from_logs:
+        samples = load_from_logs(args.from_logs)
+        samples_path = OUTPUT_DIR / "fig10_ilp_solve_times_regenerated.json"
+        with open(samples_path, "w") as f:
+            json.dump({"columns": ["run", "num_moves", "solve_time_ms"], "samples": samples}, f)
+        print(f"Saved parsed samples to {samples_path}")
+        output_path = OUTPUT_DIR / "fig10_ilp_solve_time_boxplot_regenerated.pdf"
+    else:
+        with open(DATA_FILE) as f:
+            samples = json.load(f)["samples"]
+        output_path = OUTPUT_DIR / "fig10_ilp_solve_time_boxplot.pdf"
+
+    data = group_by_moves(samples)
+    for m in sorted(data):
+        print(f"  {m} moves: n={len(data[m])}, mean={np.mean(data[m]):.1f}ms, median={np.median(data[m]):.1f}ms")
+    fig = plot_solve_time_boxplot(data)
     fig.savefig(output_path, bbox_inches='tight')
     print(f"Saved {output_path}")
     plt.close(fig)

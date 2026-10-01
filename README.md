@@ -43,3 +43,9 @@ pip install -r plots/requirements.txt
 
 for f in plots/fig*.py; do python3 "$f"; done
 ```
+
+Figure 10 (ILP solve time) plots the paper's measured solve times by default. To plot solve times from your own run of the load-vs-slowdown experiment above:
+```
+python3 plots/fig10_ilp_solve_time_boxplot.py --from-logs results/load_vs_slowdown/raw
+```
+See `plots/README.md` for details.

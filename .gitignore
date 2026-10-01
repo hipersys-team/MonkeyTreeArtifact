@@ -27,3 +27,5 @@ filtered_results
 
 plots/*.pdf
 plots/*.png
+
+plots/*_regenerated.json
